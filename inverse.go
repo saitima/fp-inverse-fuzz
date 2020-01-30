@@ -1,9 +1,8 @@
 package main
 
 import (
-	"encoding/hex"
-	//#include "stdlib.h"
 	"C"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"unsafe"
@@ -27,33 +26,50 @@ func split(in []byte, offset int) ([]byte, []byte, error) {
 	return in[:offset], in[offset:], nil
 }
 
+func byteArrToCChar(in []byte, out *C.char) {
+	inStr := hex.EncodeToString(in)
+	inCharArr := C.CString(inStr)
+	inPtr := uintptr(unsafe.Pointer(inCharArr))
+	outPtr := uintptr(unsafe.Pointer(out))
+	for i := 0; i < len(inStr); i++ {
+		inElem := (*C.char)(unsafe.Pointer(inPtr))
+		outElem := (*C.char)(unsafe.Pointer(outPtr))
+		*outElem = *inElem
+		inPtr++
+		outPtr++
+	}
+}
+
 //export c_perform_inverse
-func c_perform_inverse(in *C.char, i_len C.int, o_len *C.int) *C.char {
+func c_perform_inverse(in *C.char, i_len C.int, o *C.char, o_len *C.int) {
 	debug := os.Getenv("DEBUG")
-	_err := func(err error) *C.char {
+	_err := func(err error) {
 		if debug == "ok" {
 			fmt.Println(err)
 		}
 		*o_len = C.int(0)
-		return C.CString("")
+		byteArrToCChar([]byte{0x00}, o)
+		return
 	}
 	buf := C.GoBytes(unsafe.Pointer(in), C.int(i_len))
 	modLen := int(buf[0])
 	modulusBuf, rest, err := split(buf[1:], modLen)
 	if err != nil {
-		return _err(err)
+		_err(err)
+		return
 	}
 	elemLen := int(rest[0])
 	elemBuf, rest, err := split(rest[1:], elemLen)
 	if err != nil {
-		return _err(err)
+		_err(err)
+		return
 	}
-	// if debug == "on" {
-	// 	fmt.Printf("modLen: %x\n", modLen)
-	// 	fmt.Printf("modulusBuf: %x\n", modulusBuf)
-	// 	fmt.Printf("elemLen: %x\n", elemLen)
-	// 	fmt.Printf("elemBuf: %x\n", elemBuf)
-	// }
+	if debug == "on" {
+		fmt.Printf("modLen: %x\n", modLen)
+		fmt.Printf("modulusBuf: %x\n", modulusBuf)
+		fmt.Printf("elemLen: %x\n", elemLen)
+		fmt.Printf("elemBuf: %x\n", elemBuf)
+	}
 	if len(modulusBuf) < 8 {
 		modulusBuf = padBytes(modulusBuf, 8)
 	}
@@ -63,20 +79,23 @@ func c_perform_inverse(in *C.char, i_len C.int, o_len *C.int) *C.char {
 
 	f, err := fp.NewField(modulusBuf)
 	if err != nil {
-		return _err(err)
+		_err(err)
+		return
 	}
 
 	elem, err := f.NewFieldElementFromBytes(elemBuf)
 	if err != nil {
-		return _err(err)
+		_err(err)
+		return
 	}
 	inv := f.NewFieldElement()
 	if ok := f.Inverse(inv, elem); !ok {
-		return _err(fmt.Errorf("element has no inverse"))
+		_err(fmt.Errorf("element has no inverse"))
+		return
 	}
 	res := f.ToBytes(inv)
 	*o_len = C.int(len(res))
-	return C.CString(hex.EncodeToString(res))
+	byteArrToCChar(res, o)
 }
 
 func main() {}
