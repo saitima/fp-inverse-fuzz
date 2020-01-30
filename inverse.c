@@ -21,20 +21,20 @@ int hex2bin(char *source_str, char *dest_buffer)
 }
 
 int main()
-{  
-  char buf[] = "";  
-  char str[] = "080000f98889454fc308000001fe45623da1"; 
+{
+  char buf[] = "";
+  char str[] = "080000f98889454fc308000001fe45623da1";
   // char str[] = "01f301e3"; // has no inverse
   int o_len;
-  int len = hex2bin(str, buf);
-  char* o_buff = (char *)malloc(64*sizeof(char));
-  c_perform_inverse(buf, len, o_buff, &o_len);  
-  if(o_len == 0)
+  int len = hex2bin(str, buf);  
+  char o_buff[32];
+  c_perform_inverse(buf, len, o_buff, &o_len);
+  if (o_len == 0)
   {
     printf("no inverse\n");
     return 1;
   }
-  printf("inverse: %s\n", o_buff);
   printf("success!");
+
   return 0;
 }

@@ -2,7 +2,6 @@ package main
 
 import (
 	"C"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"unsafe"
@@ -26,20 +25,6 @@ func split(in []byte, offset int) ([]byte, []byte, error) {
 	return in[:offset], in[offset:], nil
 }
 
-func byteArrToCChar(in []byte, out *C.char) {
-	inStr := hex.EncodeToString(in)
-	inCharArr := C.CString(inStr)
-	inPtr := uintptr(unsafe.Pointer(inCharArr))
-	outPtr := uintptr(unsafe.Pointer(out))
-	for i := 0; i < len(inStr); i++ {
-		inElem := (*C.char)(unsafe.Pointer(inPtr))
-		outElem := (*C.char)(unsafe.Pointer(outPtr))
-		*outElem = *inElem
-		inPtr++
-		outPtr++
-	}
-}
-
 //export c_perform_inverse
 func c_perform_inverse(in *C.char, i_len C.int, o *C.char, o_len *C.int) {
 	debug := os.Getenv("DEBUG")
@@ -48,7 +33,7 @@ func c_perform_inverse(in *C.char, i_len C.int, o *C.char, o_len *C.int) {
 			fmt.Println(err)
 		}
 		*o_len = C.int(0)
-		byteArrToCChar([]byte{0x00}, o)
+		// byteArrToCChar([]byte{0x00}, o)
 		return
 	}
 	buf := C.GoBytes(unsafe.Pointer(in), C.int(i_len))
@@ -93,9 +78,16 @@ func c_perform_inverse(in *C.char, i_len C.int, o *C.char, o_len *C.int) {
 		_err(fmt.Errorf("element has no inverse"))
 		return
 	}
+	var resPadded [32]byte
 	res := f.ToBytes(inv)
+	copy(resPadded[32-len(res):], res[:])
 	*o_len = C.int(len(res))
-	byteArrToCChar(res, o)
+	outBuf := (*[32]byte)(unsafe.Pointer(o))
+	length := copy(outBuf[:], resPadded[:])
+	if length != len(resPadded) {
+		fmt.Printf("copy was not successfull %d %d", length, len(resPadded))
+	}
+	// fmt.Printf("[go result]: %x\n", resPadded)
 }
 
 func main() {}
